@@ -7,6 +7,7 @@ namespace irrigation {
 Controller::Controller(const Config& config) : config_(config) {}
 
 Outputs Controller::update(const Inputs& in) {
+    // 1. Các bơm mặc định tắt và các van mặc định đóng.
     Outputs out;
     if (!valid(in)) {
         resetState();
@@ -14,53 +15,98 @@ Outputs Controller::update(const Inputs& in) {
         return out;
     }
 
-    wateringNeeded_ = wateringNeeded_ ? in.soilPct < config_.soilStopPct
-                                      : in.soilPct <= config_.soilStartPct;
-    gravityPreferred_ = gravityPreferred_ ? in.upperTankL > config_.gravityStopL
-                                           : in.upperTankL >= config_.tankFullL;
-    tankUsable_ = tankUsable_ ? in.upperTankL > config_.tankIrrigationStopL
-                              : in.upperTankL >= config_.tankIrrigationStartL;
-    sourceUsable_ = sourceUsable_ ? in.lowerSourceL > config_.sourceStopL
-                                  : in.lowerSourceL >= config_.sourceStartL;
-    batteryUsable_ = batteryUsable_ ? in.batteryPct > config_.batteryStopPct
-                                    : in.batteryPct >= config_.batteryResumePct;
-    emergencyRefill_ = !tankUsable_ && (emergencyRefill_ || wateringNeeded_);
+    // 2. Dùng trạng thái lượt trước để chọn ngưỡng bắt đầu hoặc dừng.
+    if (wateringNeeded_) {
+        wateringNeeded_ = in.soilPct < config_.soilStopPct;
+    } else {
+        wateringNeeded_ = in.soilPct <= config_.soilStartPct;
+    }
+
+    if (gravityPreferred_) {
+        gravityPreferred_ = in.upperTankL > config_.gravityStopL;
+    } else {
+        gravityPreferred_ = in.upperTankL >= config_.tankFullL;
+    }
+
+    if (tankUsable_) {
+        tankUsable_ = in.upperTankL > config_.tankIrrigationStopL;
+    } else {
+        tankUsable_ = in.upperTankL >= config_.tankIrrigationStartL;
+    }
+
+    if (sourceUsable_) {
+        sourceUsable_ = in.lowerSourceL > config_.sourceStopL;
+    } else {
+        sourceUsable_ = in.lowerSourceL >= config_.sourceStartL;
+    }
+
+    if (batteryUsable_) {
+        batteryUsable_ = in.batteryPct > config_.batteryStopPct;
+    } else {
+        batteryUsable_ = in.batteryPct >= config_.batteryResumePct;
+    }
+
+    if (tankUsable_) {
+        emergencyRefill_ = false;
+    } else if (wateringNeeded_) {
+        emergencyRefill_ = true;
+    }
 
     out.criticalSoil = in.soilPct <= config_.soilCriticalPct;
     out.bothWaterSourcesUnavailable = wateringNeeded_ && !tankUsable_ && !sourceUsable_;
 
-    const float primaryW = in.pvAvailableW + (batteryUsable_ ? in.batteryAvailableW : 0.0f);
+    float primaryW = in.pvAvailableW;
+    if (batteryUsable_) {
+        primaryW += in.batteryAvailableW;
+    }
     const float fillW = config_.controllerW + config_.fillPumpW;
 
+    // 3. TH4a–TH4c: ưu tiên nạp bể. P2 và hai van giữ lệnh mặc định.
     if (emergencyRefill_) {
-        // Khoa P2 cho den khi be cao dat nguong tuoi lai.
-        if (sourceUsable_) {
-            out.requestBackup = !enough(primaryW, fillW);
-            const float availableW = primaryW +
-                (out.requestBackup ? in.backupAvailableW : 0.0f);
-            out.p1 = enough(availableW, fillW);
+        if (!sourceUsable_) {
+            return out;  // TH4c: nguồn dưới thiếu nước.
+        }
+
+        if (enough(primaryW, fillW)) {
+            out.p1 = true;  // TH4a: đủ điện để nạp bể.
+        } else {
+            out.requestBackup = true;  // TH4b: yêu cầu nguồn dự phòng.
+            if (enough(primaryW + in.backupAvailableW, fillW)) {
+                out.p1 = true;
+            }
         }
         return out;
     }
 
+    // 4. TH1–TH2: chọn đường tưới rồi cộng công suất của đường đã chọn.
     float requiredW = config_.controllerW;
     if (wateringNeeded_ && tankUsable_) {
-        if (gravityPreferred_ && enough(primaryW, requiredW + config_.gravityValveW)) {
-            out.vg = true;
-            requiredW += config_.gravityValveW;
-        } else if (!gravityPreferred_ && enough(primaryW, requiredW + config_.pressurePathW)) {
+        if (gravityPreferred_) {
+            if (enough(primaryW, requiredW + config_.gravityValveW)) {
+                out.vg = true;
+                requiredW += config_.gravityValveW;
+            }
+        } else if (enough(primaryW, requiredW + config_.pressurePathW)) {
             out.vp = true;
             out.p2 = true;
             requiredW += config_.pressurePathW;
         }
     }
 
-    // Pin day va PV du cho tai hien tai cung P1 thi nap bang PV.
-    const bool solarSurplus = in.batteryPct >= config_.batteryFullPct &&
-                              enough(in.pvAvailableW, requiredW + config_.fillPumpW);
-    const bool wantFill = (wateringNeeded_ && !gravityPreferred_) || solarSurplus;
-    out.p1 = wantFill && sourceUsable_ && in.upperTankL < config_.tankFullL &&
-             enough(primaryW, requiredW + config_.fillPumpW);
+    // 5. Xét thêm P1 để nạp bể trong TH2 hoặc tận dụng PV trong TH3.
+    const float requiredWithP1W = requiredW + config_.fillPumpW;
+    bool wantFill = false;
+    if (wateringNeeded_ && !gravityPreferred_) {
+        wantFill = true;
+    } else if (in.batteryPct >= config_.batteryFullPct &&
+               enough(in.pvAvailableW, requiredWithP1W)) {
+        wantFill = true;
+    }
+
+    const bool tankHasSpace = in.upperTankL < config_.tankFullL;
+    if (wantFill && sourceUsable_ && tankHasSpace && enough(primaryW, requiredWithP1W)) {
+        out.p1 = true;
+    }
     return out;
 }
 
@@ -78,10 +124,16 @@ bool Controller::validPower(float value) {
 }
 
 bool Controller::valid(const Inputs& in) const {
-    return in.sensorsOk && inRange(in.soilPct, 100.0f) &&
-           inRange(in.upperTankL, config_.tankCapacityL) &&
-           validPower(in.lowerSourceL) && inRange(in.batteryPct, 100.0f) &&
-           validPower(in.pvAvailableW) && validPower(in.batteryAvailableW) &&
+    if (!in.sensorsOk || !inRange(in.soilPct, 100.0f)) {
+        return false;
+    }
+    if (!inRange(in.upperTankL, config_.tankCapacityL) || !validPower(in.lowerSourceL)) {
+        return false;
+    }
+    if (!inRange(in.batteryPct, 100.0f)) {
+        return false;
+    }
+    return validPower(in.pvAvailableW) && validPower(in.batteryAvailableW) &&
            validPower(in.backupAvailableW);
 }
 
