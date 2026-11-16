@@ -4,12 +4,48 @@
 
 namespace irrigation {
 
+Inputs::Inputs(float soilPct, float upperTankL, float lowerSourceL, float batteryPct,
+               float pvAvailableW, float batteryAvailableW, float backupAvailableW,
+               bool sensorsOk, float upperTankMassKg)
+    : soilPct(soilPct), upperTankL(upperTankL), lowerSourceL(lowerSourceL),
+      batteryPct(batteryPct), pvAvailableW(pvAvailableW), batteryAvailableW(batteryAvailableW),
+      backupAvailableW(backupAvailableW), sensorsOk(sensorsOk), upperTankMassKg(upperTankMassKg) {}
+
 Controller::Controller(const Config& config) : config_(config) {}
 
 Outputs Controller::update(const Inputs& in) {
     // 1. Các bơm mặc định tắt và các van mặc định đóng.
     Outputs out;
-    if (!valid(in)) {
+
+    float upperTankL = in.upperTankL;
+    // So sánh bằng lít ở chế độ cũ và bằng mét cột nước khi dùng cân.
+    float gravityLevel = upperTankL;
+    float gravityStart = config_.tankFullL;
+    float gravityStop = config_.gravityStopL;
+    bool tankCalibrationOk = true;
+
+    if (config_.useTankMass) {
+        tankCalibrationOk = validPower(config_.emptyTankMassKg) &&
+                            std::isfinite(config_.tankLitersPerMeter) &&
+                            config_.tankLitersPerMeter > 0.0f &&
+                            std::isfinite(config_.tankBottomToOutletM) &&
+                            std::isfinite(config_.gravityStartHeadM) &&
+                            std::isfinite(config_.minGravityHeadM) &&
+                            config_.minGravityHeadM > 0.0f &&
+                            config_.gravityStartHeadM > config_.minGravityHeadM;
+        if (tankCalibrationOk) {
+            // Với nước, 1 kg xấp xỉ 1 L. Đổi thể tích thành độ sâu nước.
+            upperTankL = in.upperTankMassKg - config_.emptyTankMassKg;
+            const float waterDepthM = upperTankL / config_.tankLitersPerMeter;
+            const float gravityHeadM = config_.tankBottomToOutletM + waterDepthM;
+            tankCalibrationOk = std::isfinite(gravityHeadM);
+            gravityLevel = gravityHeadM;
+            gravityStart = config_.gravityStartHeadM;
+            gravityStop = config_.minGravityHeadM;
+        }
+    }
+
+    if (!tankCalibrationOk || !valid(in, upperTankL)) {
         resetState();
         out.inputFault = true;
         return out;
@@ -23,15 +59,15 @@ Outputs Controller::update(const Inputs& in) {
     }
 
     if (gravityPreferred_) {
-        gravityPreferred_ = in.upperTankL > config_.gravityStopL;
+        gravityPreferred_ = gravityLevel > gravityStop;
     } else {
-        gravityPreferred_ = in.upperTankL >= config_.tankFullL;
+        gravityPreferred_ = gravityLevel >= gravityStart;
     }
 
     if (tankUsable_) {
-        tankUsable_ = in.upperTankL > config_.tankIrrigationStopL;
+        tankUsable_ = upperTankL > config_.tankIrrigationStopL;
     } else {
-        tankUsable_ = in.upperTankL >= config_.tankIrrigationStartL;
+        tankUsable_ = upperTankL >= config_.tankIrrigationStartL;
     }
 
     if (sourceUsable_) {
@@ -103,7 +139,7 @@ Outputs Controller::update(const Inputs& in) {
         wantFill = true;
     }
 
-    const bool tankHasSpace = in.upperTankL < config_.tankFullL;
+    const bool tankHasSpace = upperTankL < config_.tankFullL;
     if (wantFill && sourceUsable_ && tankHasSpace && enough(primaryW, requiredWithP1W)) {
         out.p1 = true;
     }
@@ -123,11 +159,11 @@ bool Controller::validPower(float value) {
     return std::isfinite(value) && value >= 0.0f;
 }
 
-bool Controller::valid(const Inputs& in) const {
+bool Controller::valid(const Inputs& in, float upperTankL) const {
     if (!in.sensorsOk || !inRange(in.soilPct, 100.0f)) {
         return false;
     }
-    if (!inRange(in.upperTankL, config_.tankCapacityL) || !validPower(in.lowerSourceL)) {
+    if (!inRange(upperTankL, config_.tankCapacityL) || !validPower(in.lowerSourceL)) {
         return false;
     }
     if (!inRange(in.batteryPct, 100.0f)) {

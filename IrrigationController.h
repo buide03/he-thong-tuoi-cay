@@ -22,18 +22,32 @@ struct Config {
     float fillPumpW = 5.6f;
     float gravityValveW = 1.0f;
     float pressurePathW = 6.0f;  // P2 + VP
+
+    // Hiệu chuẩn cân và cột nước cho bể có tiết diện ngang không đổi.
+    bool useTankMass = false;
+    float emptyTankMassKg = 0.0f;
+    float tankLitersPerMeter = 0.0f;
+    float tankBottomToOutletM = 0.0f;
+    float gravityStartHeadM = 0.0f;
+    float minGravityHeadM = 0.0f;
 };
 
 struct Inputs {
+    Inputs() = default;
+    Inputs(float soilPct, float upperTankL, float lowerSourceL, float batteryPct,
+           float pvAvailableW, float batteryAvailableW, float backupAvailableW,
+           bool sensorsOk, float upperTankMassKg = -1.0f);
+
     // Doc tat ca gia tri truoc khi tinh lenh cho chu ky hien tai.
     float soilPct;
-    float upperTankL;
+    float upperTankL = 0.0f;  // Driver có thể bỏ qua khi bật useTankMass.
     float lowerSourceL;
     float batteryPct;
     float pvAvailableW;
     float batteryAvailableW;  // Cong suat xa toi da BMS cho phep tai bus DC.
     float backupAvailableW;   // Bang 0 cho den khi nguon du phong san sang.
     bool sensorsOk;           // Adapter dat false khi mat loi doc/du lieu qua han.
+    float upperTankMassKg = -1.0f;  // Khối lượng bể và nước. -1 khi chưa có số đo.
 };
 
 struct Outputs {
@@ -56,7 +70,7 @@ private:
     static bool enough(float availableW, float requiredW);
     static bool inRange(float value, float max);
     static bool validPower(float value);
-    bool valid(const Inputs& in) const;
+    bool valid(const Inputs& in, float upperTankL) const;
     void resetState();
 
     Config config_;

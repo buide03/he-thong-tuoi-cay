@@ -26,6 +26,22 @@ irrigation::CycleResult runIrrigationCycle() {
 
 `result.requested` chứa lệnh của bộ điều khiển và cờ cảnh báo. Nếu đọc lỗi, lệnh yêu cầu tắt hai bơm, đóng hai van và ngừng yêu cầu nguồn dự phòng. Nếu ghi lệnh lỗi, hệ thống thử gửi lại một lần với trạng thái tắt an toàn. `result.actuation` cho biết driver đã áp dụng lệnh gốc (`Applied`), đã áp dụng lệnh tắt an toàn (`SafeStateApplied`) hay đã báo lỗi cả hai lần (`OutputFailed`).
 
+## Dùng cân để chọn đường tưới
+
+Bật `config.useTankMass = true` khi driver đọc được tổng khối lượng bể và nước qua `readings.upperTankMassKg`. Trong chế độ này, driver có thể bỏ qua `readings.upperTankL`. Bộ điều khiển tự lấy khối lượng tổng trừ khối lượng bể rỗng để ước tính lượng nước (1 kg nước ≈ 1 L).
+
+| Thông số cấu hình | Cách xác định |
+| --- | --- |
+| `emptyTankMassKg` | Cân bể rỗng khi đã lắp đặt, cùng các bộ phận mà cảm biến cân đỡ |
+| `tankLitersPerMeter` | Chia lượng nước đổ thêm (L) cho độ tăng mực nước (m). Dùng cho bể có tiết diện ngang không đổi |
+| `tankBottomToOutletM` | Độ cao đáy bể trừ độ cao đầu tưới (m). Có thể âm |
+| `minGravityHeadM` | Ngưỡng dừng tưới trọng lực. Tắt P2, mở VG và đo lưu lượng để xác định cột nước tối thiểu đủ tưới |
+| `gravityStartHeadM` | Ngưỡng bắt đầu ưu tiên trọng lực. Đặt cao hơn `minGravityHeadM` để giảm đóng ngắt quanh ngưỡng |
+
+Cột nước bằng `tankBottomToOutletM + số lít / tankLitersPerMeter`. Khi cột nước đạt ngưỡng bắt đầu, bộ điều khiển ưu tiên VG và giữ P2 tắt. Khi cột nước giảm tới ngưỡng dừng, bộ điều khiển xét VP và P2 nếu cây còn cần tưới, bể còn đủ nước và đủ công suất. Lượng nước từ cân cũng dùng để xét nạp bể và dừng tưới khi nước quá ít.
+
+Chế độ dùng cân mặc định tắt để các driver đo trực tiếp bằng lít tiếp tục hoạt động. Khi bật chế độ này, nếu cân mất số đo, giá trị vượt dung tích bể hoặc cấu hình hiệu chuẩn sai, chương trình báo `inputFault` và gửi lệnh tắt.
+
 ## Chạy ví dụ trên máy tính
 
 Từ thư mục gốc của repo, biên dịch hai file lõi cùng ví dụ:
