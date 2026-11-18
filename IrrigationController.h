@@ -54,6 +54,10 @@ struct Inputs {
     bool upperLowWet = false;   // Nước chạm công tắc mức thấp an toàn.
     bool upperFullWet = false;  // Nước chạm công tắc mức đầy.
     bool sourceWet = false;     // Nguồn dưới đủ nước che đầu hút P1.
+    bool hasElectricalReading = false;
+    float busVoltageV = 0.0f;
+    float busCurrentA = 0.0f;  // Có dấu theo chiều đấu cảm biến.
+    float busPowerW = 0.0f;    // Công suất đang đo, có dấu.
 };
 
 struct Outputs {

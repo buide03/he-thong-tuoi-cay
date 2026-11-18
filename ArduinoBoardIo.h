@@ -49,10 +49,13 @@ public:
         : pin_(pin), dryAdc_(dryAdc), wetAdc_(wetAdc) {}
 
     bool read(float& percent) override {
-        if (pin_ < 0 || wetAdc_ == dryAdc_) {
+        if (pin_ < 0 || dryAdc_ < 0 || wetAdc_ < 0 || wetAdc_ == dryAdc_) {
             return false;
         }
         const float raw = analogRead(pin_);
+        if (raw < 0) {
+            return false;
+        }
         percent = (raw - dryAdc_) * 100.0f / (wetAdc_ - dryAdc_);
         if (percent < 0.0f) {
             percent = 0.0f;

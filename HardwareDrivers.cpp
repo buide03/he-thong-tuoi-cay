@@ -4,8 +4,9 @@ namespace irrigation {
 
 HardwareSensors::HardwareSensors(BoardIo& io, const SensorWiring& wiring,
                                  NumberSensor& soil, PowerSensor& power,
-                                 NumberSensor* tankMass)
-    : io_(io), wiring_(wiring), soil_(soil), power_(power), tankMass_(tankMass) {}
+                                 NumberSensor* tankMass, ElectricalSensor* electrical)
+    : io_(io), wiring_(wiring), soil_(soil), power_(power), tankMass_(tankMass),
+      electrical_(electrical) {}
 
 bool HardwareSensors::begin() {
     low_ = SwitchState{};
@@ -62,6 +63,16 @@ bool HardwareSensors::read(Inputs& readings) {
     }
     if (tankMass_ != nullptr && !tankMass_->read(readings.upperTankMassKg)) {
         return false;
+    }
+    if (electrical_ != nullptr) {
+        ElectricalReadings measured;
+        if (!electrical_->read(measured)) {
+            return false;
+        }
+        readings.busVoltageV = measured.voltageV;
+        readings.busCurrentA = measured.currentA;
+        readings.busPowerW = measured.powerW;
+        readings.hasElectricalReading = true;
     }
     readings.batteryPct = power.batteryPct;
     readings.pvAvailableW = power.pvAvailableW;

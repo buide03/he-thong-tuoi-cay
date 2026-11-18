@@ -36,6 +36,18 @@ public:
     virtual bool read(PowerReadings& readings) = 0;
 };
 
+struct ElectricalReadings {
+    float voltageV = 0.0f;
+    float currentA = 0.0f;
+    float powerW = 0.0f;
+};
+
+class ElectricalSensor {
+public:
+    virtual ~ElectricalSensor() = default;
+    virtual bool read(ElectricalReadings& readings) = 0;
+};
+
 struct SwitchConfig {
     int pin;
     bool wetHigh;  // HIGH có nghĩa là nước chạm cảm biến khi true.
@@ -53,7 +65,8 @@ class HardwareSensors final : public SensorDriver {
 public:
     // soil đọc %, tankMass đọc tổng khối lượng kg. Con trỏ null khi không dùng cân.
     HardwareSensors(BoardIo& io, const SensorWiring& wiring, NumberSensor& soil,
-                    PowerSensor& power, NumberSensor* tankMass = nullptr);
+                    PowerSensor& power, NumberSensor* tankMass = nullptr,
+                    ElectricalSensor* electrical = nullptr);
     bool begin();
     bool read(Inputs& readings) override;
 
@@ -71,6 +84,7 @@ private:
     NumberSensor& soil_;
     PowerSensor& power_;
     NumberSensor* tankMass_;
+    ElectricalSensor* electrical_;
     SwitchState low_;
     SwitchState full_;
     SwitchState source_;

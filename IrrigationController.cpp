@@ -182,6 +182,12 @@ bool Controller::validPower(float value) {
 }
 
 bool Controller::valid(const Inputs& in, float upperTankL) const {
+    if (in.hasElectricalReading) {
+        if (!validPower(in.busVoltageV) || !std::isfinite(in.busCurrentA) ||
+            !std::isfinite(in.busPowerW)) {
+            return false;
+        }
+    }
     if (!in.sensorsOk || !inRange(in.soilPct, 100.0f)) {
         return false;
     }
