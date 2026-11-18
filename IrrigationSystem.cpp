@@ -12,6 +12,9 @@ CycleResult IrrigationSystem::tick() {
     const Outputs requested = controller_.update(readings);
 
     if (actuators_.apply(requested)) {
+        if (actuators_.pending()) {
+            return {requested, ActuationStatus::Pending};
+        }
         return {requested, ActuationStatus::Applied};
     }
 

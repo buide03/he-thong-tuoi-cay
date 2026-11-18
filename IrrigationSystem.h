@@ -21,10 +21,13 @@ public:
     // Apply the complete requested state. Return false on a write failure.
     // A default Outputs{} requests pumps off, valves closed and backup off.
     virtual bool apply(const Outputs& commands) = 0;
+    // Driver có thể đang chờ van mở trước khi bật bơm.
+    virtual bool pending() const { return false; }
 };
 
 enum class ActuationStatus {
     Applied,
+    Pending,
     SafeStateApplied,
     OutputFailed
 };

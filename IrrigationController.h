@@ -30,6 +30,9 @@ struct Config {
     float tankBottomToOutletM = 0.0f;
     float gravityStartHeadM = 0.0f;
     float minGravityHeadM = 0.0f;
+
+    // Hai công tắc bể cao và một công tắc nguồn dưới.
+    bool useTankSwitches = false;
 };
 
 struct Inputs {
@@ -48,6 +51,9 @@ struct Inputs {
     float backupAvailableW;   // Bang 0 cho den khi nguon du phong san sang.
     bool sensorsOk;           // Adapter dat false khi mat loi doc/du lieu qua han.
     float upperTankMassKg = -1.0f;  // Khối lượng bể và nước. -1 khi chưa có số đo.
+    bool upperLowWet = false;   // Nước chạm công tắc mức thấp an toàn.
+    bool upperFullWet = false;  // Nước chạm công tắc mức đầy.
+    bool sourceWet = false;     // Nguồn dưới đủ nước che đầu hút P1.
 };
 
 struct Outputs {

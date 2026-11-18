@@ -76,6 +76,18 @@ Outputs Controller::update(const Inputs& in) {
         sourceUsable_ = in.lowerSourceL >= config_.sourceStartL;
     }
 
+    if (config_.useTankSwitches) {
+        sourceUsable_ = in.sourceWet;
+        if (config_.useTankMass) {
+            // Công tắc cạn có quyền dừng tưới dù cân đang báo còn nước.
+            tankUsable_ = tankUsable_ && in.upperLowWet;
+        } else {
+            // Công tắc chỉ xác định vùng nước, không suy ra một số lít giả.
+            tankUsable_ = in.upperLowWet;
+            gravityPreferred_ = in.upperFullWet;
+        }
+    }
+
     if (batteryUsable_) {
         batteryUsable_ = in.batteryPct > config_.batteryStopPct;
     } else {
@@ -101,6 +113,9 @@ Outputs Controller::update(const Inputs& in) {
     if (emergencyRefill_) {
         if (!sourceUsable_) {
             return out;  // TH4c: nguồn dưới thiếu nước.
+        }
+        if (config_.useTankSwitches && in.upperFullWet) {
+            return out;  // Công tắc đầy khóa P1 kể cả khi cân báo thiếu nước.
         }
 
         if (enough(primaryW, fillW)) {
@@ -139,7 +154,14 @@ Outputs Controller::update(const Inputs& in) {
         wantFill = true;
     }
 
-    const bool tankHasSpace = upperTankL < config_.tankFullL;
+    bool tankHasSpace = upperTankL < config_.tankFullL;
+    if (config_.useTankSwitches) {
+        if (config_.useTankMass) {
+            tankHasSpace = tankHasSpace && !in.upperFullWet;
+        } else {
+            tankHasSpace = !in.upperFullWet;
+        }
+    }
     if (wantFill && sourceUsable_ && tankHasSpace && enough(primaryW, requiredWithP1W)) {
         out.p1 = true;
     }
@@ -163,7 +185,17 @@ bool Controller::valid(const Inputs& in, float upperTankL) const {
     if (!in.sensorsOk || !inRange(in.soilPct, 100.0f)) {
         return false;
     }
-    if (!inRange(upperTankL, config_.tankCapacityL) || !validPower(in.lowerSourceL)) {
+    if (config_.useTankSwitches) {
+        if (in.upperFullWet && !in.upperLowWet) {
+            return false;  // Công tắc cao ướt nhưng công tắc thấp khô.
+        }
+    }
+    if (config_.useTankMass || !config_.useTankSwitches) {
+        if (!inRange(upperTankL, config_.tankCapacityL)) {
+            return false;
+        }
+    }
+    if (!config_.useTankSwitches && !validPower(in.lowerSourceL)) {
         return false;
     }
     if (!inRange(in.batteryPct, 100.0f)) {
