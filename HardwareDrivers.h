@@ -28,6 +28,13 @@ struct PowerReadings {
     float pvAvailableW = 0.0f;
     float batteryAvailableW = 0.0f;
     float backupAvailableW = 0.0f;
+    bool hasSourceReadings = false;
+    float solarVoltageV = 0.0f;
+    float solarCurrentA = 0.0f;
+    float solarPowerW = 0.0f;
+    float batteryVoltageV = 0.0f;
+    float batteryCurrentA = 0.0f;
+    float batteryPowerW = 0.0f;
 };
 
 class PowerSensor {

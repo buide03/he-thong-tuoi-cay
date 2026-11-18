@@ -88,7 +88,13 @@ Outputs Controller::update(const Inputs& in) {
         }
     }
 
-    if (batteryUsable_) {
+    if (config_.useBatteryVoltage) {
+        if (batteryUsable_) {
+            batteryUsable_ = in.batteryVoltageV > config_.batteryStopV;
+        } else {
+            batteryUsable_ = in.batteryVoltageV >= config_.batteryResumeV;
+        }
+    } else if (batteryUsable_) {
         batteryUsable_ = in.batteryPct > config_.batteryStopPct;
     } else {
         batteryUsable_ = in.batteryPct >= config_.batteryResumePct;
@@ -146,11 +152,14 @@ Outputs Controller::update(const Inputs& in) {
 
     // 5. Xét thêm P1 để nạp bể trong TH2 hoặc tận dụng PV trong TH3.
     const float requiredWithP1W = requiredW + config_.fillPumpW;
+    bool allowSolarFill = in.batteryPct >= config_.batteryFullPct;
+    if (config_.useBatteryVoltage) {
+        allowSolarFill = in.batteryVoltageV >= config_.solarFillVoltageV;
+    }
     bool wantFill = false;
     if (wateringNeeded_ && !gravityPreferred_) {
         wantFill = true;
-    } else if (in.batteryPct >= config_.batteryFullPct &&
-               enough(in.pvAvailableW, requiredWithP1W)) {
+    } else if (allowSolarFill && enough(in.pvAvailableW, requiredWithP1W)) {
         wantFill = true;
     }
 
@@ -182,6 +191,22 @@ bool Controller::validPower(float value) {
 }
 
 bool Controller::valid(const Inputs& in, float upperTankL) const {
+    if (config_.useBatteryVoltage) {
+        if (!in.hasSourceReadings || !validPower(config_.batteryStopV) ||
+            !std::isfinite(config_.batteryResumeV) ||
+            config_.batteryResumeV <= config_.batteryStopV ||
+            !std::isfinite(config_.solarFillVoltageV) ||
+            config_.solarFillVoltageV < config_.batteryResumeV) {
+            return false;
+        }
+    }
+    if (in.hasSourceReadings) {
+        if (!validPower(in.solarVoltageV) || !std::isfinite(in.solarCurrentA) ||
+            !std::isfinite(in.solarPowerW) || !validPower(in.batteryVoltageV) ||
+            !std::isfinite(in.batteryCurrentA) || !std::isfinite(in.batteryPowerW)) {
+            return false;
+        }
+    }
     if (in.hasElectricalReading) {
         if (!validPower(in.busVoltageV) || !std::isfinite(in.busCurrentA) ||
             !std::isfinite(in.busPowerW)) {

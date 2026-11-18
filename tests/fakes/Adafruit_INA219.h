@@ -4,6 +4,7 @@
 class TwoWire {
 public:
     void begin() {}
+    bool begin(int, int, uint32_t) { return true; }
 };
 extern TwoWire Wire;
 extern float fakeVoltage;

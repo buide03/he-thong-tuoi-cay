@@ -33,6 +33,10 @@ struct Config {
 
     // Hai công tắc bể cao và một công tắc nguồn dưới.
     bool useTankSwitches = false;
+    bool useBatteryVoltage = false;
+    float batteryStopV = 11.8f;
+    float batteryResumeV = 12.4f;
+    float solarFillVoltageV = 13.5f;
 };
 
 struct Inputs {
@@ -58,6 +62,13 @@ struct Inputs {
     float busVoltageV = 0.0f;
     float busCurrentA = 0.0f;  // Có dấu theo chiều đấu cảm biến.
     float busPowerW = 0.0f;    // Công suất đang đo, có dấu.
+    bool hasSourceReadings = false;
+    float solarVoltageV = 0.0f;
+    float solarCurrentA = 0.0f;
+    float solarPowerW = 0.0f;
+    float batteryVoltageV = 0.0f;
+    float batteryCurrentA = 0.0f;
+    float batteryPowerW = 0.0f;
 };
 
 struct Outputs {

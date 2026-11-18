@@ -13,6 +13,8 @@ Driver công tắc đầy/cạn, cảm biến đất và relay cùng khung tích
 
 Driver HX711, INA219 và ví dụ ghép các cảm biến nằm trong [SENSOR_MODULES.md](SENSOR_MODULES.md). Thư viện tương ứng cần được cài khi biên dịch hai driver này.
 
+Cấu hình ESP32-WROOM-32 với hai INA219 đo PV/pin, HX711, relay và ngưỡng điện áp ắc quy 12 V nằm trong [ESP32_BUILD.md](ESP32_BUILD.md).
+
 1. Tạo lớp kế thừa `irrigation::SensorDriver` và cài đặt `bool read(irrigation::Inputs& readings)`. Điền đầy đủ độ ẩm (%), mức nước (L), mức pin (%) và công suất khả dụng (W) trong một chu kỳ. Trả về `false` nếu thiếu số đo, đọc lỗi hoặc dữ liệu đã quá hạn. Đặt `backupAvailableW = 0` khi nguồn dự phòng chưa sẵn sàng.
 2. Tạo lớp kế thừa `irrigation::ActuatorDriver` và cài đặt `bool apply(const irrigation::Outputs& commands)`. Ánh xạ `p1`, `p2`, `vg`, `vp` và `requestBackup` sang phần cứng. Driver chịu trách nhiệm về mức kích hoạt của relay và trình tự chuyển van, bơm. Trả về `false` nếu ghi lệnh thất bại.
 3. Khởi tạo driver và chân GPIO về trạng thái an toàn khi khởi động. Tạo một đối tượng hệ thống dùng suốt chương trình, truyền hai driver đã khởi tạo vào constructor và gọi `tick()` theo chu kỳ. Hai driver cần tồn tại ít nhất bằng thời gian sống của hệ thống.

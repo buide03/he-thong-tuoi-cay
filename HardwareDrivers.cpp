@@ -78,6 +78,13 @@ bool HardwareSensors::read(Inputs& readings) {
     readings.pvAvailableW = power.pvAvailableW;
     readings.batteryAvailableW = power.batteryAvailableW;
     readings.backupAvailableW = power.backupAvailableW;
+    readings.hasSourceReadings = power.hasSourceReadings;
+    readings.solarVoltageV = power.solarVoltageV;
+    readings.solarCurrentA = power.solarCurrentA;
+    readings.solarPowerW = power.solarPowerW;
+    readings.batteryVoltageV = power.batteryVoltageV;
+    readings.batteryCurrentA = power.batteryCurrentA;
+    readings.batteryPowerW = power.batteryPowerW;
     readings.sensorsOk = true;
     return true;
 }

@@ -14,9 +14,11 @@ inline int analogRead(int) { return fakeAdc; }
 inline int digitalRead(int pin) { return fakePins[pin] ? HIGH : LOW; }
 inline void digitalWrite(int pin, int value) { fakePins[pin] = value == HIGH; }
 inline void pinMode(int, int) {}
+inline void analogReadResolution(int) {}
 struct FakeSerial {
     void begin(int) {}
-    void println(const char*) {}
+    template <typename T> void print(const T&) {}
+    template <typename T> void println(const T&) {}
 };
 extern FakeSerial Serial;
 #endif
